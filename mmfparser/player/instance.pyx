@@ -19,6 +19,8 @@ cdef extern from "math.h":
     bint isnan(double x)
     double NAN
 
+cimport cython
+
 from mmfparser.player.collision cimport collides
 from mmfparser.data.chunkloaders.frame import NONE_PARENT
 from mmfparser.player.movements import make_direction
@@ -165,6 +167,7 @@ cdef inline void update_player_position(Instance self):
         objectPlayer.y = glY
         objectPlayer.set_position(glX, glY)
 
+@cython.final
 cdef class Instance(PlayerChild):
     def initialize(self, objectInstance, int layer = -1):
         initialize_movements()

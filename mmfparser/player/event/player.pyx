@@ -15,6 +15,8 @@
 # You should have received a copy of the GNU General Public License
 # along with Anaconda.  If not, see <http://www.gnu.org/licenses/>.
 
+cimport cython
+
 import time
 import random
 from collections import defaultdict
@@ -264,7 +266,7 @@ cdef class Container(PlayerChild):
         except ValueError:
             pass
     
-    cpdef inline bint is_enabled(self):
+    cpdef bint is_enabled(self):
         return self.enabled and self.parentContainer.is_enabled()
     
     cpdef enable(self):
@@ -281,7 +283,7 @@ cdef class BaseContainer(Container):
     def initialize(self):
         pass
     
-    cpdef inline bint is_enabled(self):
+    cpdef bint is_enabled(self):
         return True
 
 cdef class Loop:

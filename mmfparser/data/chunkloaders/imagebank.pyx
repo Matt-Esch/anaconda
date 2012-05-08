@@ -37,6 +37,8 @@ Yves:
 	}
 """
 
+cimport cython
+
 import struct
 import zlib
 from cStringIO import StringIO
@@ -118,7 +120,7 @@ cdef class BasePoint
 cdef class BasePoint:
     cdef public:
         int size
-    cdef inline unsigned int read(self, char * data, int position):
+    cdef unsigned int read(self, char * data, int position):
         pass
 
 cdef class Point(BasePoint):
