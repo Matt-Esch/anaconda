@@ -56,10 +56,10 @@ class Mouse(DataLoader):
         unusedFlags = reader.readShort()
     
     def write(self, reader):
-        reader.writeShort(self.leftX)
-        reader.writeShort(self.rightX)
-        reader.writeShort(self.upperY)
-        reader.writeShort(self.bottomY)
+        reader.writeShort(self.x1)
+        reader.writeShort(self.x2)
+        reader.writeShort(self.y1)
+        reader.writeShort(self.y2)
         reader.writeShort(0)
 
 class Race(DataLoader):

@@ -36,7 +36,7 @@ objectTypes = {
     1 : 'Backdrop',
     2 : 'Active',
     3 : 'Text',
-    4 : 'Question', # Question object
+    4 : 'Question',
     5 : 'Score',
     6 : 'Lives',
     7 : 'Counter',

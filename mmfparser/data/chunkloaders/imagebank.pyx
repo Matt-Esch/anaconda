@@ -15,28 +15,6 @@
 # You should have received a copy of the GNU General Public License
 # along with Anaconda.  If not, see <http://www.gnu.org/licenses/>.
 
-"""
-Image bank.
-
-Yves:
-
-	switch (depth) {
-	case 8:
-		widthBytes = (width+1) & ~1;
-		break;
-	case 15:
-	case 16:
-		widthBytes = width * 2;
-		break;
-	case 24:
-		widthBytes = ((width+1) & ~1) * 3;
-		break;
-	case 32:
-		widthBytes = width * 4;
-		break;
-	}
-"""
-
 cimport cython
 
 import struct
@@ -90,8 +68,7 @@ cdef inline str joinImage(bytes points, bytes alpha):
         c_array[i] = points_c[i] | ((<unsigned char *>alpha_c)[i] << 24)
     return new_points
 
-cdef inline object createDisplay(ImageItem item, frame):
-    from mmfparser.player.sprite import ImageData
+cdef inline object getImageData(ImageItem item, frame):
     cdef unsigned int point
     cdef unsigned int transparent
     cdef object points = indexImage(item, frame)
@@ -109,6 +86,11 @@ cdef inline object createDisplay(ImageItem item, frame):
                 c_array[i] = points_c[i]
             else:
                 c_array[i] = points_c[i] | <unsigned int>(0xFF << 24)
+    return data
+
+cdef inline object createDisplay(ImageItem item, frame):
+    data = getImageData(item, frame)
+    from mmfparser.player.sprite import ImageData
     newImage = ImageData(item.width, item.height, 'RGBA', data,
         -item.width * 4, item.alpha)
     newImage.anchor_x = item.xHotspot
@@ -368,14 +350,12 @@ cdef class ImageItem(DataLoader):
         short actionX
         short actionY
         object flags
-        object _image
-        object _alpha
+        object image
+        object alpha
         bint indexed
-        tuple delayedReader
         object createdImage
         char graphicMode
         tuple transparent
-        # object saved
 
     cpdef initialize(self):
         self.flags = IMAGE_FLAGS.copy()
@@ -414,11 +394,10 @@ cdef class ImageItem(DataLoader):
         self.yHotspot = newReader.readShort()
         self.actionX = newReader.readShort()
         self.actionY = newReader.readShort()
-        if not old:
+        if old:
+            self.transparent = (0, 0, 0)
+        else:
             self.transparent = newReader.readColor()
-        if False:#not self.settings.get('loadImages', True):
-            self.delayedReader = (newReader, size)
-            return
         self.load(newReader, size)
     
     def write(self, reader):
@@ -445,7 +424,7 @@ cdef class ImageItem(DataLoader):
         newReader.writeShort(self.yHotspot)
         newReader.writeShort(self.actionX)
         newReader.writeShort(self.actionY)
-        newReader.writeColor(self.transparent)
+        newReader.writeColor(self.transparent or (0, 0, 0))
         newReader.writeReader(dataReader)
 
         reader.writeInt(self.handle)
@@ -453,22 +432,6 @@ cdef class ImageItem(DataLoader):
             reader.writeReader(newReader)
         else:
             reader.writeReader(zlibdata.compress(newReader))
-    
-    @property
-    def image(self):
-        self.load_delayed()
-        return self._image
-        
-    @property
-    def alpha(self):
-        self.load_delayed()
-        return self._alpha
-    
-    def load_delayed(self):
-        if self.delayedReader is not None:
-            reader, size = self.delayedReader
-            self.delayedReader = None
-            self.load(reader, size)
         
     def load(self, reader, size):
         cdef BasePoint pointClass
@@ -505,21 +468,25 @@ cdef class ImageItem(DataLoader):
         else:
             image, imageSize = read_rgb(data, width, height, pointClass)
             alphaSize = size - imageSize
-        self._image = image
+        self.image = image
 
         if self.flags['Alpha']:
             pad = (alphaSize - width * height) / height
-            self._alpha = read_alpha(data, width, height, size - alphaSize)
+            self.alpha = read_alpha(data, width, height, size - alphaSize)
     
     def createDisplay(self, frame = None, **kw):
-        self.load_delayed()
         foo = createDisplay(self, frame)
+        self.unload()
+        return foo
+    
+    def getImageData(self, frame = None, **kw):
+        foo = getImageData(self, frame)
         self.unload()
         return foo
 
     def unload(self):
-        self._image = None
-        self._alpha = None
+        self.image = None
+        self.alpha = None
         self.createdImage = None
     
     def getGraphicMode(self):

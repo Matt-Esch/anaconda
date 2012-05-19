@@ -23,8 +23,8 @@ class ExtData(DataLoader):
     data = None
     def read(self, reader):
         if self.settings.get('old', False):
-            name = reader.readString()
-            data = reader.read()
+            self.filename = reader.readString()
+            self.data = reader.read()
         else:
             reader.checkDefault(reader.readInt(), 0)
             reader.checkDefault(reader.read(), '')

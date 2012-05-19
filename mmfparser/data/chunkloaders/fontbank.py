@@ -58,19 +58,41 @@ class FontItem(DataLoader):
             reader.writeReader(zlibdata.compress(compressedReader))
         else:
             reader.writeReader(compressedReader)
+    
+class OldFont(FontItem):
+    handle = None
+    checksum = None
+    references = None
+    value = None
+    def read(self, reader):
+        self.handle = reader.readInt(True)
+        from mmfparser.data.onepointfive import decompress
+        new_data = decompress(reader)
+        self.checksum = new_data.readShort(True)
+        self.references = new_data.readInt()
+        new_data.skipBytes(4 * 2) # dunno
+        self.value = self.new(LogFont, new_data)
+        self.value.settings['old'] = False
 
 class FontBank(DataLoader):
     items = None
     offsets = None
     def read(self, reader):
         debug = self.settings.get('debug', False)
+        old = self.settings.get('old', False)
         if debug:
             path = reader.readString()
             reader = ByteReader(open(path, 'rb'))
             reader.skipBytes(4)
 
         numberOfItems = reader.readInt()
-        self.items = [self.new(FontItem, reader)
+        
+        if old:
+            klass = OldFont
+        else:
+            klass = FontItem
+        
+        self.items = [self.new(klass, reader)
             for _ in xrange(numberOfItems)]
                 
     def write(self, reader):

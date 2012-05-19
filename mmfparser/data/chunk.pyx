@@ -277,12 +277,13 @@ cdef inline void setup():
     
     global oldLoadersReal
     oldLoadersReal = {
+        8739 : oldchunks.AppHeader,
         8740 : all.AppName,
         8741 : all.AppAuthor,
         8742 : all.AppMenu,
         8743 : all.ExtPath,
-        8745 : all.FrameItems, # FrameItems
-        8767 : all.FrameItems, # FrameItems_2
+        8745 : oldchunks.FrameItems, # FrameItems
+        8767 : oldchunks.FrameItems, # FrameItems_2
         8747 : all.FrameHandles, # FrameHandles
         8748 : all.ExtData, # ExtData
         8750 : all.EditorFilename, # AppEditorFilename
@@ -292,14 +293,33 @@ cdef inline void setup():
         8757 : all.AppIcon, # AppIcon_16x16x8
         17476 : all.ObjectHeader, # ObjInfoHeader
         17477 : all.ObjectName,
+        17478 : oldchunks.ObjectProperties,
+        #
+        13107 : oldchunks.Frame,
+        13108 : oldchunks.FrameHeader, # FrameHeader
+        13109 : all.FrameName, # FrameName
+        13110 : all.FramePassword, # FramePassword
+        13111 : all.FramePalette, # FramePalette
+        13112 : oldchunks.ObjectInstances, # FrameItemInstances
+        13113 : createPreservingLoader(), # FrameFadeInFrame
+        13114 : createPreservingLoader(), # FrameFadeOutFrame
+        13115 : all.FadeIn, # FrameFadeIn
+        13116 : all.FadeOut, # FrameFadeOut
+        13117 : oldchunks.Events, # FrameEvents
+        13118 : createPreservingLoader(), # FramePlayHeader
+        13119 : createPreservingLoader(), # Additional_FrameItem
+        13120 : createPreservingLoader(), # Additional_FrameItemInstance
+        #
         26214 : all.ImageBank, # Images
+        26215 : all.FontBank,
+        26216 : all.SoundBank,
+        # 26217 : all.MusicBank, # Musics
         32639 : all.Last, # Last
     }
 
 class OldLoaders:
     def __getitem__(self, key):
         try:
-            print key
             return oldLoadersReal[key]
         except KeyError:
             return createPreservingLoader()

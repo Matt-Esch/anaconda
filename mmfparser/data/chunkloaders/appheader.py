@@ -120,6 +120,57 @@ class PlayerControl(DataLoader):
     def write(self, reader):
         reader.writeShort(self.controlType)
 
+HEADER_FLAGS = BitDict(
+    'BorderMax',
+    'NoHeading',
+    'Panic',
+    'SpeedIndependent',
+    'Stretch',
+    'MusicOn', # obsolete?
+    'SoundOn', # obsolete?
+    'MenuHidden',
+    'MenuBar',
+    'Maximize', # maximized at bootup?
+    'MultiSamples',
+    'FullscreenAtStart',
+    'FullscreenSwitch',
+    'Protected', # wonder...
+    'Copyright',
+    'OneFile' # ?
+)
+
+HEADER_NEW_FLAGS = BitDict(
+    'SamplesOverFrames',
+    'RelocFiles',
+    'RunFrame',
+    'SamplesWhenNotFocused',
+    'NoMinimizeBox',
+    'NoMaximizeBox',
+    'NoThickFrame',
+    'DoNotCenterFrame',
+    'ScreensaverAutostop',
+    'DisableClose',
+    'HiddenAtStart',
+    'XPVisualThemes',
+    'VSync',
+    'RunWhenMinimized',
+    'MDI',
+    'RunWhileResizing',
+)
+
+HEADER_OTHER_FLAGS = BitDict(
+    'DebuggerShortcuts',
+    'DirectX',
+    'VRAM',
+    'Obsolete',
+    'AutoImageFilter',
+    'AutoSoundFilter',
+    'AllInOne', # no idea
+    'ShowDebugger',
+    'Reserved1',
+    'Reserved2'
+)
+
 class AppHeader(DataLoader):
     borderColor = None
     numberOfFrames = None
@@ -138,56 +189,9 @@ class AppHeader(DataLoader):
     checksum = None
 
     def initialize(self):
-        self.flags = BitDict(
-            'BorderMax',
-            'NoHeading',
-            'Panic',
-            'SpeedIndependent',
-            'Stretch',
-            'MusicOn', # obsolete?
-            'SoundOn', # obsolete?
-            'MenuHidden',
-            'MenuBar',
-            'Maximize', # maximized at bootup?
-            'MultiSamples',
-            'FullscreenAtStart',
-            'FullscreenSwitch',
-            'Protected', # wonder...
-            'Copyright',
-            'OneFile' # ?
-        )
-        
-        self.newFlags = BitDict(
-            'SamplesOverFrames',
-            'RelocFiles',
-            'RunFrame',
-            'SamplesWhenNotFocused',
-            'NoMinimizeBox',
-            'NoMaximizeBox',
-            'NoThickFrame',
-            'DoNotCenterFrame',
-            'ScreensaverAutostop',
-            'DisableClose',
-            'HiddenAtStart',
-            'XPVisualThemes',
-            'VSync',
-            'RunWhenMinimized',
-            'MDI',
-            'RunWhileResizing',
-        )
-        
-        self.otherFlags = BitDict(
-            'DebuggerShortcuts',
-            'DirectX',
-            'VRAM',
-            'Obsolete',
-            'AutoImageFilter',
-            'AutoSoundFilter',
-            'AllInOne', # no idea
-            'ShowDebugger',
-            'Reserved1',
-            'Reserved2'
-        )
+        self.flags = HEADER_FLAGS.copy()
+        self.newFlags = HEADER_NEW_FLAGS.copy()
+        self.otherFlags = HEADER_OTHER_FLAGS.copy()
 
         # self.controls = self.new(Controls)
     

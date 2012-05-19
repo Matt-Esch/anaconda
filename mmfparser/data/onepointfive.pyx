@@ -17,6 +17,7 @@
 
 from mmfparser.bytereader cimport ByteReader
 from mmfparser.common cimport allocate_memory
+from libc.stdlib cimport malloc, free
 
 cdef extern from "tinflate.c":
     void tinf_init()
@@ -25,9 +26,23 @@ cdef extern from "tinflate.c":
 
 tinf_init()
 
+cdef char * buffer = NULL
+
+def decompress_single(ByteReader reader):
+    cdef unsigned int buffer_size = 1024 * 1024 * 10
+    global buffer
+    if buffer == NULL:
+        buffer = <char*>malloc(buffer_size) # allocate 10 mb
+    cdef int start = reader.tell()
+    data = reader.read()
+    cdef int bytesread = tinf_uncompress(<void *>buffer, &buffer_size,
+        <void *>(<char *>data), len(data))
+    reader.seek(start + bytesread)
+    return ByteReader(buffer[:buffer_size])
+
 def decompress(ByteReader reader):
     cdef unsigned int decompressed_size = reader.readInt(True)
-    cdef unsigned int size = decompressed_size
+    cdef unsigned int saved_size = decompressed_size
     cdef char * buf
     cdef int start = reader.tell()
     data = reader.read()
@@ -35,7 +50,7 @@ def decompress(ByteReader reader):
     cdef int bytesread = tinf_uncompress(<void *>buf, &decompressed_size,
         <void *>(<char *>data), len(data))
     reader.seek(start + bytesread)
-    if decompressed_size != size:
-        raise Exception('decompression failed (%s, %s)' % (size,
+    if decompressed_size != saved_size:
+        raise Exception('decompression failed (%s, %s)' % (saved_size,
             decompressed_size))
     return ByteReader(new_data)

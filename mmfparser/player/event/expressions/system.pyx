@@ -39,7 +39,7 @@ cdef class Abs(Expression):
 
 cdef class NewLine(Expression):
     cdef object evaluate(self):
-        return '\n'
+        return '\r\n'
 
 cdef class UpperString(Expression):
     cdef object evaluate(self):

@@ -68,8 +68,14 @@ class eventInformations2(Structure):
     ]
 
 GETVERSIONFUNC = CFUNCTYPE(c_int)
+VERSION_INT = c_int(0)
+VERSION_POINTER = POINTER(c_int)(VERSION_INT)
+GETVERSIONFUNC2 = CFUNCTYPE(c_int, c_int, c_int, c_int, c_int, c_int)
+MN_ACTIONS = 20000
+MN_CONDITIONS = 20001
+MN_EXPRESSIONS = 20002
 
-class _mv(Structure):
+class _mvstruct(Structure):
     _fields_ = [
         ('mvHInst', wintypes.HINSTANCE),
         ('mvIdAppli', c_void_p),
@@ -133,6 +139,18 @@ class _mv(Structure):
         ('mvAdditionalFncs', c_void_p * 16),
     ]
 
+class _mv15struct(Structure):
+    _fields_ = [
+        ('dummy', c_char * 636), # 636
+        ('mvGetVersion', GETVERSIONFUNC)
+    ]
+
+class _mv0struct(Structure):
+    _fields_ = [
+        ('dummy', c_char * 336),
+        ('getVersion', GETVERSIONFUNC)
+    ]
+
 MMFVERSION_MASK	= 0xFFFF0000
 MMFBUILD_MASK = 0x00000FFF		# MMF build
 MMFVERFLAG_MASK = 0x0000F000
@@ -143,15 +161,34 @@ MMFVERFLAG_PLUGIN = 0x00001000		# Plugin
 MMFVERSION_15 = 0x01050000		# MMF 1.5
 MMFVERSION_20 = 0x02000000		# MMF 2.0
 
+EXT_VERSION1 = 0x200
+EXT_VERSION2 = 0x300
+EXT_PLUGIN_VERSION1 = 0x100
+
 def getVersion():
     return MMFVERSION_20 | MMFVERFLAG_PRO | 246
 
 def createMv():
-    newMv = _mv()
+    newMv = _mvstruct()
+    newMv.mvGetVersion = GETVERSIONFUNC(getVersion)
+    return byref(newMv)
+
+def createMv15():
+    newMv = _mv15struct()
+    newMv.mvGetVersion = GETVERSIONFUNC(getVersion)
+    return byref(newMv)
+
+def createMv0():
+    newMv = _mv0struct()
     newMv.mvGetVersion = GETVERSIONFUNC(getVersion)
     return byref(newMv)
 
 _mv = createMv()
+_mv15 = createMv15()
+_mv0 = createMv15()
+
+class state:
+    mv = None
 
 def loadLibrary(path):
     try:
@@ -160,6 +197,43 @@ def loadLibrary(path):
     except WindowsError, e:
         print e, path
         return None
+
+MF_BYPOSITION = 0x00000400
+MF_SEPARATOR = 0x00000800
+MF_POPUP = 0x00000010
+MF_STRING = 0x00000000
+
+def copyMenu(dst, src):
+    user32 = windll.user32
+    nMn = user32.GetMenuItemCount(src)
+    strBuf = create_string_buffer(80)
+    for n in xrange(nMn):
+        id = user32.GetMenuItemID(src, n)
+        if id == 0:
+            user32.AppendMenuA(dst, MF_SEPARATOR, 0, 0)
+        else:
+            user32.GetMenuStringA(src, n, strBuf, 80, MF_BYPOSITION)
+            if id != -1:
+                menu_state = user32.GetMenuState(src, n, MF_BYPOSITION)
+                user32.AppendMenuA(dst, menu_state, id, strBuf)
+            else:
+                newmenu = user32.CreatePopupMenu()
+                user32.AppendMenuA(dst, MF_POPUP | MF_STRING, newmenu, strBuf)
+                copyMenu(newmenu, user32.GetSubMenu(src, n))
+
+def loadMenu(handle, resource):
+    user32 = windll.user32
+    menu = user32.LoadMenuA(handle, resource)
+    if not menu:
+        return 0
+    submenu = user32.GetSubMenu(menu, 0)
+    if not submenu:
+        return 0
+    popup = user32.CreatePopupMenu()
+    if not popup:
+        return 0
+    copyMenu(popup, submenu)
+    return popup
 
 def getItems(hmenu, codeFunction):
     nums = {}
@@ -174,35 +248,38 @@ def getItems(hmenu, codeFunction):
                     nums[num] = name
             elif not item.isSeperator and not item.isDisabled:
                 itemId = windll.user32.GetMenuItemID(hmenu, index)
-                realId = c_short(codeFunction(_mv, c_short(itemId)))
+                realId = c_short(codeFunction(state.mv, c_short(itemId)))
                 nums[realId.value] = [item.name]
             index += 1
     except winguiauto.WinGuiAutoError:
         pass
     return nums
 
-def getActionMenu(extension):
-    try:
-        menu = extension.library.GetActionMenu(_mv, c_void_p(), 
-            c_void_p())
-    except AttributeError:
-        return {}
+def getActionMenu(extension, menu = None):
+    if menu is None:
+        try:
+            menu = extension.library.GetActionMenu(state.mv, c_void_p(), 
+                c_void_p())
+        except AttributeError:
+            return {}
     return getItems(menu, extension.library.GetActionCodeFromMenu)
 
-def getConditionMenu(extension):
-    try:
-        menu = extension.library.GetConditionMenu(_mv, c_void_p(), 
-            c_void_p())
-    except AttributeError:
-        return {}
+def getConditionMenu(extension, menu = None):
+    if menu is None:
+        try:
+            menu = extension.library.GetConditionMenu(state.mv, c_void_p(), 
+                c_void_p())
+        except AttributeError:
+            return {}
     return getItems(menu, extension.library.GetConditionCodeFromMenu)
 
-def getExpressionMenu(extension):
-    try:
-        menu = extension.library.GetExpressionMenu(_mv, c_void_p(), 
-            c_void_p())
-    except AttributeError:
-        return {}
+def getExpressionMenu(extension, menu = None):
+    if menu is None:
+        try:
+            menu = extension.library.GetExpressionMenu(state.mv, c_void_p(), 
+                c_void_p())
+        except AttributeError:
+            return {}
     return getItems(menu, extension.library.GetExpressionCodeFromMenu)
 
 def getDescription(extension):
@@ -213,7 +290,7 @@ def getDescription(extension):
     objectSite = create_string_buffer(256)
     
     try:
-        extension.library.GetObjInfos(extension._mv, c_void_p(), 
+        extension.library.GetObjInfos(extension.state.mv, c_void_p(), 
         byref(objectName), byref(objectAuthor), byref(objectCopyright), 
         byref(objectComment), byref(objectSite))
     except AttributeError:
@@ -230,19 +307,19 @@ def getRunInfos(extension):
 
 def getActionDescription(self, extension, num):
     data = create_string_buffer(256)
-    extension.library.GetActionString(_mv, c_short(num), 
+    extension.library.GetActionString(state.mv, c_short(num), 
         byref(data), c_short(256))
     return data.value
 
 def getConditionDescription(self, extension, num):
     data = create_string_buffer(256)
-    extension.library.GetConditionString(_mv, c_short(num), 
+    extension.library.GetConditionString(state.mv, c_short(num), 
         byref(data), c_short(256))
     return data.value
 
 def getExpressionDescription(self, extension, num):
     data = create_string_buffer(256)
-    extension.library.GetExpressionString(_mv, c_short(num), 
+    extension.library.GetExpressionString(state.mv, c_short(num), 
         byref(data), c_short(256))
     return data.value
 
@@ -275,7 +352,7 @@ class ACE(object):
         if num == -1:
             return
         offset = getattr(
-            extension.library, self.infoFunction)(_mv, c_short(num))
+            extension.library, self.infoFunction)(state.mv, c_short(num))
         if extension.pluginVersion == 0:
             self.info = oldAceInfos.from_address(offset)
             for parameter in self.info.param:
@@ -291,7 +368,7 @@ class ACE(object):
         for i in xrange(len(parameterTypes)):
             data = create_string_buffer(256)
             try:
-                getattr(extension.library, self.titleFunction)(_mv, c_short(num), 
+                getattr(extension.library, self.titleFunction)(state.mv, c_short(num), 
                     c_short(i), byref(data), c_short(256))
             except AttributeError:
                 parameters.append(Parameter(parameterTypes[i], '(not found)'))
@@ -333,8 +410,6 @@ class Expression(ACE):
         return RETURN_TYPES[self.info.flags]
 
 class LoadedExtension(object):
-    _mv = None
-    
     pluginVersion = None
     
     actionMenu = None
@@ -351,29 +426,43 @@ class LoadedExtension(object):
 
     def __init__(self, library):
         self.library = library
-        self._mv = _mv
-        
-        try:
-            library.Initialize(_mv, 0)
-        except AttributeError:
-            pass
         
         self.pluginVersion = library.GetInfos(KGI_PLUGIN)
+        self.version = library.GetInfos(KGI_VERSION)
+        
+        action_hmenu = None
+        condition_hmenu = None
+        expression_hmenu = None
+        
+        if self.version == EXT_VERSION1:
+            state.mv = _mv0
+        elif self.version == EXT_VERSION2:
+            if self.pluginVersion == EXT_VERSION1:
+                state.mv = _mv15
+            else:
+                state.mv = _mv
+        
+        try:
+            library.Initialize(state.mv, 0)
+        except AttributeError:
+            pass
+            
+        handle = library._handle
+        action_hmenu = loadMenu(handle, MN_ACTIONS)
+        condition_hmenu = loadMenu(handle, MN_CONDITIONS)
+        expression_hmenu = loadMenu(handle, MN_EXPRESSIONS)
 
-        self.actionMenu = getActionMenu(self)
-
+        self.actionMenu = getActionMenu(self, action_hmenu)
         self.actions = [Action(self, num)
             for num in self.actionMenu.keys()]
             
-        self.conditionMenu = getConditionMenu(self)
-        self.conditions = [Condition(
-            self, num) for num in self.conditionMenu.keys()]
+        self.conditionMenu = getConditionMenu(self, condition_hmenu)
+        self.conditions = [Condition(self, num) 
+            for num in self.conditionMenu.keys()]
             
-        self.expressionMenu = getExpressionMenu(self)
-        self.expressions = [Expression(
-            self, num) for num in self.expressionMenu.keys()]
-        
-        print self.actions
+        self.expressionMenu = getExpressionMenu(self, expression_hmenu)
+        self.expressions = [Expression(self, num) 
+            for num in self.expressionMenu.keys()]
         
         self.description = getDescription(self)
         self.runInfos = getRunInfos(self)

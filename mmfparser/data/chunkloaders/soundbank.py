@@ -98,6 +98,59 @@ class FlashSound(BaseSound):
         self.handle = reader.readShort()
         self.name = reader.readString(reader.readShort())
 
+class OldSound(BaseSound):
+    def initialize(self):
+        self.flags = SOUND_FLAGS.copy()
+
+    def read(self, reader):
+        self.handle = reader.readInt(True)
+        from mmfparser.data.onepointfive import decompress
+        new_data = decompress(reader)
+        self.checksum = new_data.readShort(True)
+        self.references = new_data.readInt(True)
+        size = new_data.readInt(True)
+        self.flags.setFlags(new_data.readInt(True))
+        reserved = new_data.readInt() # reserved
+        self.name = new_data.read(new_data.readInt(True)).replace('\x00', '')
+        self.format = new_data.readShort(True)
+        self.channel_count = new_data.readShort(True)
+        self.sample_rate = new_data.readInt(True)
+        self.byte_rate = new_data.readInt(True)
+        self.block_align = new_data.readShort(True)
+        self.bits_per_sample = new_data.readShort(True)
+        new_data.readShort() # dunno
+        self.chunk_size = new_data.readInt(True)
+        self.data = new_data.read(self.chunk_size)
+    
+    def get_wav(self):
+        reader = ByteReader()
+        reader.write('RIFF')
+        reader.writeInt(len(self.data) - 44)
+        reader.write('WAVEfmt ')
+        reader.writeInt(16, True)
+        reader.writeShort(self.format, True)
+        reader.writeShort(self.channel_count, True)
+        reader.writeInt(self.sample_rate, True)
+        reader.writeInt(self.byte_rate, True)
+        reader.writeShort(self.block_align, True)
+        reader.writeShort(self.bits_per_sample, True)
+        reader.write('data')
+        reader.writeInt(self.chunk_size, True)
+        reader.write(self.data)
+        return reader
+    
+    def write(self, reader):
+        data = self.get_wav()
+        reader.writeInt(self.handle, True)
+        reader.writeInt(self.checksum)
+        reader.writeInt(self.references)
+        reader.writeInt(len(data) + len(self.name) + 1)
+        reader.writeInt(self.flags.getFlags())
+        reader.writeInt(0)
+        reader.writeInt(len(self.name) + 1)
+        reader.write(self.name + '\x00')
+        reader.writeReader(data)
+
 class SoundBank(DataLoader):
     items = None
     
@@ -105,9 +158,11 @@ class SoundBank(DataLoader):
         self.items = []
 
     def read(self, reader):
+        # reader.openEditor()
         debug = self.settings.get('debug', False)
         java = self.settings.get('java', False)
         flash = self.settings.get('flash', False)
+        old = self.settings.get('old', False)
 
         if debug:
             path = reader.readString()
@@ -119,11 +174,16 @@ class SoundBank(DataLoader):
             itemsToRead = reader.readShort()
             if flash:
                 itemClass = FlashSound
+            elif old:
+                itemClass = OldSound
             else:
                 itemClass = JavaSound
         else:
             itemsToRead = reader.readInt()
-            itemClass = SoundItem
+            if old:
+                itemClass = OldSound
+            else:
+                itemClass = SoundItem
 
         compressed = not debug
             
