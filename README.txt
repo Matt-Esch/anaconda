@@ -7,7 +7,8 @@ support for Windows, Linux and Mac OS X.
 Downloads
 =========
 
-Binary builds will be available shortly.
+Binary builds are a available on the GitHub project page:
+https://github.com/matpow2/anaconda/downloads
 
 License FAQ
 ===========
